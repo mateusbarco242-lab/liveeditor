@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Meu Editor HTML — Live Editor Avançado</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2c3e50">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root{
+      --bg: #2c3e50;
+      --panel: #1e1e1e;
+      --text: #d4d4d4;
+      --accent: #27ae60;
+      --preview-bg: #ffffff;
+      --editor-border: #2c3e50;
+    }
+    [data-theme="light"]{
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --text: #222;
+      --accent: #007bff;
+      --preview-bg: #ffffff;
+      --editor-border: #dfe6ee;
+    }
+    body {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+    header {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 0 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 50px;
+      border-bottom: 3px solid var(--editor-border);
+    }
+    header h1 { font-size: 1.05rem; font-weight: 600; display:flex; gap:8px; align-items:center;}
+    .actions { display: flex; gap: 8px; align-items:center; }
+    button, .btn {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    button.secondary {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text);
+    }
+    .workspace {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 50px);
+      min-height: 0;
+    }
+    .panel {
+      height: 100%;
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+    }
+    .editor-container {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      border-right: 5px solid var(--editor-border);
+      background: var(--panel);
+    }
+    .editor-label {
+      background: rgba(0,0,0,0.06);
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+    }
+    textarea#htmlCode {
+      flex: 1;
+      width: 100%;
+      background-color: transparent;
+      color: var(--text);
+      border: none;
+      padding: 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      resize: none;
+      outline: none;
+      line-height: 1.45;
+      overflow: auto;
+    }
+    .preview-container {
+      width: 50%;
+      background-color: var(--preview-bg);
+      position: relative;
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+    }
+    iframe#preview {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background-color: var(--preview-bg);
+    }
+    .resizer {
+      width: 8px;
+      cursor: col-resize;
+      background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent);
+    }
+    .editor-top {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      padding:8px 12px;
+      border-bottom:1px solid rgba(0,0,0,0.06);
+      background: linear-gradient(180deg, rgba(0,0,0,0.02), transparent);
+    }
+    .small { font-size:0.85rem; padding:6px 10px; border-radius:5px; }
+    .status {
+      margin-left:8px;
+      font-size:0.8rem;
+      color:rgba(255,255,255,0.7);
+    }
+    .flex { display:flex; gap:8px; align-items:center; }
+    @media (max-width: 768px) {
+      .workspace { flex-direction: column; }
+      .editor-container, .preview-container { width: 100%; height: 50%; }
+      .editor-container { border-right: none; border-bottom: 5px solid var(--editor-border); }
+      .resizer { height:8px; width:100%; cursor: row-resize; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>⚡ Live Editor</h1>
+    <div class="actions">
+      <button id="copyBtn" class="small" title="Copiar o HTML atual">📋 Copiar</button>
+      <button id="downloadBtn" class="small" title="Baixar arquivo index.html">⬇️ Baixar</button>
+      <button id="toggleTheme" class="small secondary" title="Alternar tema">Tema</button>
+      <button id="fullscreenBtn" class="small" title="Tela Cheia">⛶ Tela Cheia</button>
+    </div>
+  </header>
+
+  <div class="workspace" id="workspace">
+    <div class="editor-container panel">
+      <div class="editor-top">
+        <div class="flex">
+          <div class="editor-label">Digite seu código HTML / CSS / JS abaixo:</div>
+        </div>
+        <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+          <label class="status" id="autosaveStatus">Salvo localmente</label>
+          <button id="clearStorage" class="small secondary" title="Limpar salvamento local">Limpar</button>
+        </div>
+      </div>
+      <textarea id="htmlCode" placeholder="Cole seu código aqui..."></textarea>
+    </div>
+
+    <div class="resizer" id="dragbar" title="Arraste para redimensionar"></div>
+
+    <div class="preview-container panel" id="previewBox">
+      <iframe id="preview" allowfullscreen sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const codeInput = document.getElementById('htmlCode');
+    const previewFrame = document.getElementById('preview');
+    const previewContainer = document.getElementById('previewBox');
+    const copyBtn = document.getElementById('copyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const toggleTheme = document.getElementById('toggleTheme');
+    const autosaveStatus = document.getElementById('autosaveStatus');
+    const clearStorage = document.getElementById('clearStorage');
+    const dragbar = document.getElementById('dragbar');
+    const editorPanel = document.querySelector('.editor-container');
+    const previewPanel = document.querySelector('.preview-container');
+    const workspace = document.getElementById('workspace');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    const defaultCode = `<style>
+  body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; color: #333; margin: 0;}
+  .box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width:400px;}
+  h1 { color: #007bff; margin-bottom: 10px; }
+  button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 15px;}
+  button:hover { background: #0056b3; }
+</style>
+<div class="box">
+  <h1>Olá!</h1>
+  <p>Edite o código à esquerda para ver mudanças.</p>
+  <button onclick="alert('Funciona!')">Clique Aqui</button>
+</div>`;
+
+    function applyTheme(theme) {
+      if (theme === 'light') document.documentElement.setAttribute('data-theme','light');
+      else document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('liveeditor-theme', theme);
+    }
+    toggleTheme.addEventListener('click', () => {
+      const current = localStorage.getItem('liveeditor-theme') || 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+    });
+    applyTheme(localStorage.getItem('liveeditor-theme') || 'dark');
+
+    function updatePreview(){
+      const code = codeInput.value;
+      const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
+      doc.open();
+      doc.write(code);
+      doc.close();
+    }
+    codeInput.addEventListener('input', () => {
+      updatePreview();
+      scheduleAutosave();
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(codeInput.value);
+        copyBtn.textContent = '✅ Copiado';
+        setTimeout(()=> copyBtn.textContent = '📋 Copiar', 1200);
+      } catch (e) {
+        alert('Não foi possível copiar. Use Ctrl/Cmd+C');
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      const blob = new Blob([codeInput.value], {type: 'text/html;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'index.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        if (previewContainer.requestFullscreen) previewContainer.requestFullscreen();
+        else if (previewContainer.webkitRequestFullscreen) previewContainer.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    });
+
+    const STORAGE_KEY = 'liveeditor-code-v1';
+    let autosaveTimer = null;
+    function scheduleAutosave(){
+      autosaveStatus.textContent = 'Salvando...';
+      if (autosaveTimer) clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        localStorage.setItem(STORAGE_KEY, codeInput.value);
+        autosaveStatus.textContent = 'Salvo localmente';
+      }, 700);
+    }
+    const saved = localStorage.getItem(STORAGE_KEY);
+    codeInput.value = saved || defaultCode;
+    updatePreview();
+
+    clearStorage.addEventListener('click', () => {
+      if (confirm('Remover código salvo localmente?')) {
+        localStorage.removeItem(STORAGE_KEY);
+        codeInput.value = defaultCode;
+        updatePreview();
+      }
+    });
+
+    let isDragging = false;
+    dragbar.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      document.body.style.userSelect = 'none';
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const rect = workspace.getBoundingClientRect();
+      if (window.innerWidth <= 768) {
+        const percent = (e.clientY - rect.top) / rect.height * 100;
+        editorPanel.style.height = percent + '%';
+        previewPanel.style.height = (100 - percent) + '%';
+      } else {
+        const percent = (e.clientX - rect.left) / rect.width * 100;
+        editorPanel.style.width = percent + '%';
+        previewPanel.style.width = (100 - percent) + '%';
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.userSelect = '';
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(() => {
+        console.log('Service Worker registrado.');
+      }).catch(()=>{ console.log('Falha ao registrar Service Worker'); });
+    }
+
+    window.addEventListener('beforeunload', () => {
+      localStorage.setItem(STORAGE_KEY, codeInput.value);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        localStorage.setItem(STORAGE_KEY, codeInput.value);
+        autosaveStatus.textContent = 'Salvo manualmente';
+        setTimeout(()=> autosaveStatus.textContent = 'Salvo localmente', 800);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        const start = codeInput.selectionStart, end = codeInput.selectionEnd;
+        const selected = codeInput.value.slice(start, end);
+        const beaut = selected.split('\\n').map(line => '  ' + line).join('\\n');
+        codeInput.setRangeText(beaut, start, end, 'end');
+        updatePreview();
+      }
+    });
+
+    window.updatePreview = updatePreview;
+  </script>
+</body>
+</html>
